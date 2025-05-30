@@ -29,7 +29,7 @@ class CodeChunk:
     content: str
     start_line: int
     end_line: int
-    type: str  # 'function', 'class', 'block', or 'fragment'
+    type: str  
     name: Optional[str] = None
     language: Optional[str] = None
     embedding: Optional[List[float]] = None
