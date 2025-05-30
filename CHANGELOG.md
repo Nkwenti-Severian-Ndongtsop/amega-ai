@@ -13,6 +13,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Role hierarchy system with admin, moderator, and user roles
 - Security test suite for RBAC functionality
 - DeepSource integration for code quality
+- Intelligent code chunking system in embedder.py with:
+  - Language-specific parsing for Python (AST-based) and JavaScript
+  - Smart chunk size management with configurable overlap
+  - Support for functions, classes, and code blocks
+  - Fallback mechanisms for robust parsing
+  - Extensible language detection system
 
 ### Changed
 - Updated DeepSource configuration for Python and Shell analysis
