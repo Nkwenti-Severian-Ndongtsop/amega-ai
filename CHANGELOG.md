@@ -26,12 +26,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Comprehensive error handling and logging
   - Environment-based configuration
   - Context-aware text preparation for improved embeddings
+- New dependencies for embedding functionality:
+  - aiohttp>=3.9.0 for async HTTP requests
+  - tenacity>=8.2.0 for retry logic
+  - numpy>=1.24.0 for vector operations
 
 ### Changed
 - Updated DeepSource configuration for Python and Shell analysis
 - Simplified .deepsource.toml configuration
 - Fixed role hierarchy implementation in security middleware
 - Enhanced CodeChunk dataclass with embedding support
+- Updated requirements.txt with new dependencies
 
 ### Deprecated
 - N/A
