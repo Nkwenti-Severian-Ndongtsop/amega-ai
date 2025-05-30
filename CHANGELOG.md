@@ -19,11 +19,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Support for functions, classes, and code blocks
   - Fallback mechanisms for robust parsing
   - Extensible language detection system
+- Vector embedding generation system with:
+  - Support for multiple providers (OpenAI, Nomic, Ollama)
+  - Async batch processing with configurable batch sizes
+  - Automatic retry logic with exponential backoff
+  - Comprehensive error handling and logging
+  - Environment-based configuration
+  - Context-aware text preparation for improved embeddings
 
 ### Changed
 - Updated DeepSource configuration for Python and Shell analysis
 - Simplified .deepsource.toml configuration
 - Fixed role hierarchy implementation in security middleware
+- Enhanced CodeChunk dataclass with embedding support
 
 ### Deprecated
 - N/A
@@ -37,4 +45,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Security
 - Implemented role-based access control (RBAC) middleware
 - Added security headers middleware
-- Created role hierarchy with proper permission inheritance 
+- Created role hierarchy with proper permission inheritance
+- Secure API key handling for embedding providers 
