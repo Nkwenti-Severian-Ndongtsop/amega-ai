@@ -1,159 +1,148 @@
-"""
-Unit tests for the configuration module.
-"""
-
+"""Tests for the configuration module."""
 import os
-from pathlib import Path
 import pytest
-from pydantic import ValidationError
-from backend.config import (
-    Settings,
-    Environment,
-    LogLevel,
-    LLMBackend,
-    get_settings,
-)
+from backend.config import Settings, LLMConfig, BackendConfig
 
-@pytest.fixture
-def env_vars():
-    """Set up test environment variables."""
-    old_env = dict(os.environ)
-    test_env = {
-        "ENVIRONMENT": "testing",
-        "DB_URL": "postgresql://test:test@localhost:5432/test_db",
-        "JWT_SECRET_KEY": "test-secret-key",
-        "REDIS_URL": "redis://localhost:6379",
-        "LLM_BACKEND": "ollama",
-        "LOG_LEVEL": "DEBUG"
-    }
-    os.environ.update(test_env)
-    yield test_env
-    os.environ.clear()
-    os.environ.update(old_env)
+def test_default_settings():
+    """Test default settings are loaded correctly."""
+    settings = Settings()
+    
+    # Test app settings
+    assert settings.APP_NAME == "AMEGA-AI"
+    assert settings.APP_VERSION == "0.1.0"
+    assert settings.DEBUG is False
+    
+    # Test LLM settings
+    assert settings.ACTIVE_LLM_BACKEND == "huggingface"
+    assert settings.LLM_CONFIG.temperature == 0.7
+    assert settings.LLM_CONFIG.max_length == 1000
 
-@pytest.fixture
-def mock_settings():
-    """Create test settings with minimal required config."""
-    return Settings(
-        database={"URL": "postgresql://test:test@localhost:5432/test_db"},
-        security={"SECRET_KEY": "test-secret-key"}
+def test_llm_config_validation():
+    """Test LLM configuration validation."""
+    # Test valid values
+    config = LLMConfig(
+        temperature=0.8,
+        max_length=500,
+        top_p=0.95,
+        repetition_penalty=1.5,
+        top_k=40,
+        presence_penalty=1.0,
+        frequency_penalty=-1.0
     )
+    assert config.temperature == 0.8
+    assert config.max_length == 500
+    
+    # Test invalid values
+    with pytest.raises(ValueError):
+        LLMConfig(temperature=1.5)  # Above max
+    
+    with pytest.raises(ValueError):
+        LLMConfig(temperature=-0.1)  # Below min
+    
+    with pytest.raises(ValueError):
+        LLMConfig(presence_penalty=2.5)  # Above max
 
-def test_settings_defaults(mock_settings):
-    """Test default configuration values."""
-    assert mock_settings.APP_NAME == "Amega AI"
-    assert mock_settings.VERSION == "0.1.0"
-    assert mock_settings.ENVIRONMENT == Environment.DEVELOPMENT
-    assert mock_settings.api.HOST == "0.0.0.0"
-    assert mock_settings.api.PORT == 8000
-    assert mock_settings.llm.BACKEND == LLMBackend.OLLAMA
-    assert mock_settings.llm.DEFAULT_MODEL == "llama2"
-    assert mock_settings.logging.LEVEL == LogLevel.INFO
-
-def test_settings_from_env(env_vars):
-    """Test loading configuration from environment variables."""
-    settings = Settings(
-        database={"URL": env_vars["DB_URL"]},
-        security={"SECRET_KEY": env_vars["JWT_SECRET_KEY"]}
+def test_backend_config():
+    """Test backend configuration."""
+    config = BackendConfig(
+        api_key="test-key",
+        api_base="https://api.example.com",
+        organization_id="org-123",
+        model_name="test-model",
+        timeout=45
     )
-    assert settings.ENVIRONMENT == Environment.TESTING
-    assert str(settings.database.URL) == env_vars["DB_URL"]
-    assert settings.security.SECRET_KEY == env_vars["JWT_SECRET_KEY"]
-    assert settings.redis.URL == env_vars["REDIS_URL"]
-    assert settings.llm.BACKEND == LLMBackend.OLLAMA
-    assert settings.logging.LEVEL == LogLevel.DEBUG
+    
+    assert config.api_key == "test-key"
+    assert config.model_name == "test-model"
+    assert config.timeout == 45
 
-@pytest.mark.skipif(os.getenv("CI") == "true", reason="Skip in CI environment")
-def test_required_settings():
-    """Test validation of required settings."""
-    with pytest.raises(ValidationError) as exc_info:
-        Settings(database={"URL": None}, security={"SECRET_KEY": None})
-    assert "DB_URL" in str(exc_info.value)
-    assert "JWT_SECRET_KEY" in str(exc_info.value)
+def test_active_backend_config():
+    """Test getting active backend configuration."""
+    settings = Settings()
+    
+    # Test default (HuggingFace)
+    active_config = settings.get_active_backend_config()
+    assert active_config.model_name == "microsoft/DialoGPT-medium"
+    
+    # Test switching backend
+    settings.ACTIVE_LLM_BACKEND = "openai"
+    active_config = settings.get_active_backend_config()
+    assert active_config.model_name == "gpt-3.5-turbo"
 
-def test_cors_origins_parsing(mock_settings):
-    """Test CORS origins parsing from string."""
-    settings = Settings(
-        database={"URL": "postgresql://test:test@localhost:5432/test_db"},
-        security={
-            "SECRET_KEY": "test-secret-key",
-            "CORS_ORIGINS": "http://localhost,https://example.com"
-        }
-    )
-    assert settings.security.CORS_ORIGINS == ["http://localhost", "https://example.com"]
+def test_environment_variables():
+    """Test loading settings from environment variables."""
+    # Set test environment variables
+    os.environ["AMEGA_APP_NAME"] = "Test App"
+    os.environ["AMEGA_ACTIVE_LLM_BACKEND"] = "openai"
+    os.environ["AMEGA_OPENAI_CONFIG__MODEL_NAME"] = "gpt-4"
+    os.environ["AMEGA_OPENAI_CONFIG__API_KEY"] = "test-openai-key"
+    os.environ["AMEGA_LLM_CONFIG__TEMPERATURE"] = "0.9"
+    
+    settings = Settings()
+    
+    assert settings.APP_NAME == "Test App"
+    assert settings.ACTIVE_LLM_BACKEND == "openai"
+    assert settings.OPENAI_CONFIG.model_name == "gpt-4"
+    assert settings.OPENAI_CONFIG.api_key == "test-openai-key"
+    assert settings.LLM_CONFIG.temperature == 0.9
+    
+    # Clean up environment variables
+    del os.environ["AMEGA_APP_NAME"]
+    del os.environ["AMEGA_ACTIVE_LLM_BACKEND"]
+    del os.environ["AMEGA_OPENAI_CONFIG__MODEL_NAME"]
+    del os.environ["AMEGA_OPENAI_CONFIG__API_KEY"]
+    del os.environ["AMEGA_LLM_CONFIG__TEMPERATURE"]
 
-    settings = Settings(
-        database={"URL": "postgresql://test:test@localhost:5432/test_db"},
-        security={
-            "SECRET_KEY": "test-secret-key",
-            "CORS_ORIGINS": ["http://localhost"]
-        }
-    )
-    assert settings.security.CORS_ORIGINS == ["http://localhost"]
+def test_yaml_config(tmp_path):
+    """Test loading configuration from YAML file."""
+    # Create a test YAML file
+    yaml_content = """
+app:
+  name: YAML Test App
+  version: 1.0.0
+  debug: true
 
-@pytest.mark.skipif(os.getenv("CI") == "true", reason="Skip in CI environment")
-def test_directory_creation():
-    """Test automatic directory creation."""
-    test_dir = Path("test_data")
-    settings = Settings(
-        database={"URL": "postgresql://test:test@localhost:5432/test_db"},
-        security={"SECRET_KEY": "test-secret-key"},
-        MODELS_DIR=test_dir
-    )
-    assert test_dir.exists()
-    assert test_dir.is_dir()
-    test_dir.rmdir()  # Clean up
+llm:
+  active_backend: anthropic
+  backends:
+    anthropic:
+      model_name: claude-test
+      api_key: test-key
+  generation:
+    temperature: 0.5
+    max_length: 2000
+    """
+    
+    yaml_file = tmp_path / "test_config.yml"
+    yaml_file.write_text(yaml_content)
+    
+    settings = Settings.from_yaml(yaml_file)
+    
+    assert settings.APP_NAME == "YAML Test App"
+    assert settings.ACTIVE_LLM_BACKEND == "anthropic"
+    assert settings.ANTHROPIC_CONFIG.model_name == "claude-test"
+    assert settings.LLM_CONFIG.temperature == 0.5
 
-def test_get_settings(mock_settings):
-    """Test get_settings function returns the same instance."""
-    settings1 = get_settings()
-    settings2 = get_settings()
-    assert settings1 is settings2  # Singleton pattern
+def test_settings_env_override():
+    """Test environment variables override default settings."""
+    os.environ["AMEGA_APP_NAME"] = "Override Test"
+    os.environ["AMEGA_DEBUG"] = "true"
+    
+    settings = Settings()
+    assert settings.APP_NAME == "Override Test"
+    assert settings.DEBUG is True
+    
+    del os.environ["AMEGA_APP_NAME"]
+    del os.environ["AMEGA_DEBUG"]
 
-def test_llm_settings_validation(mock_settings):
-    """Test LLM settings validation."""
-    settings = Settings(
-        database={"URL": "postgresql://test:test@localhost:5432/test_db"},
-        security={"SECRET_KEY": "test-secret-key"},
-        llm={"BACKEND": "openai"}
-    )
-    assert settings.llm.BACKEND == LLMBackend.OPENAI
+def test_database_url_validation():
+    """Test database URL validation."""
+    valid_url = "postgresql://user:pass@localhost:5432/db"
+    settings = Settings(DATABASE_URL=valid_url)
+    assert str(settings.DATABASE_URL) == valid_url
 
-    with pytest.raises(ValidationError):
-        Settings(
-            database={"URL": "postgresql://test:test@localhost:5432/test_db"},
-            security={"SECRET_KEY": "test-secret-key"},
-            llm={"BACKEND": "invalid_backend"}
-        )
-
-def test_logging_settings(mock_settings):
-    """Test logging settings configuration."""
-    log_file = Path("test.log")
-    settings = Settings(
-        database={"URL": "postgresql://test:test@localhost:5432/test_db"},
-        security={"SECRET_KEY": "test-secret-key"},
-        logging={
-            "LEVEL": "ERROR",
-            "FILE": log_file,
-            "FORMAT": "%(message)s"
-        }
-    )
-    assert settings.logging.LEVEL == LogLevel.ERROR
-    assert settings.logging.FILE == log_file
-    assert settings.logging.FORMAT == "%(message)s"
-
-def test_database_settings():
-    """Test database settings configuration."""
-    settings = Settings(
-        database={
-            "URL": "postgresql://test:test@localhost:5432/test_db",
-            "POOL_SIZE": 10,
-            "MAX_OVERFLOW": 20,
-            "ECHO": True
-        },
-        security={"SECRET_KEY": "test-secret-key"}
-    )
-    assert str(settings.database.URL) == "postgresql://test:test@localhost:5432/test_db"
-    assert settings.database.POOL_SIZE == 10
-    assert settings.database.MAX_OVERFLOW == 20
-    assert settings.database.ECHO is True 
+def test_allowed_origins():
+    """Test ALLOWED_ORIGINS configuration."""
+    custom_origins = ["https://example.com", "http://localhost:8080"]
+    settings = Settings(ALLOWED_ORIGINS=custom_origins)
+    assert settings.ALLOWED_ORIGINS == custom_origins

@@ -1,24 +1,13 @@
 name: Dependency Management
 
 on:
-  push:
-    paths:
-      - 'requirements*.txt'
-      - 'pyproject.toml'
-      - 'poetry.lock'
-      - 'package.json'
-      - 'package-lock.json'
-      - '.github/workflows/dependencies.yml'
+  workflow_dispatch:
   pull_request:
     paths:
-      - 'requirements*.txt'
-      - 'pyproject.toml'
-      - 'poetry.lock'
-      - 'package.json'
-      - 'package-lock.json'
-  schedule:
-    - cron: '0 0 * * 1'  # Weekly on Monday
-  workflow_dispatch:
+      - 'requirements.txt'
+      - 'requirements/*.txt'
+      - '.github/workflows/dependencies.yml'
+    types: [opened, synchronize, reopened]
 
 jobs:
   check-dependencies:
@@ -51,43 +40,24 @@ jobs:
         run: |
           if [ -f "requirements.txt" ]; then
             echo "Checking requirements.txt format..."
-            pip check requirements.txt || echo "Requirements check failed but continuing..."
+            if ! pip check requirements.txt; then
+              echo "::error::Requirements check failed"
+              exit 1
+            fi
+            echo "Requirements check passed successfully"
           else
             echo "No requirements.txt found, skipping check"
           fi
-        continue-on-error: true
 
       - name: Check for known vulnerabilities
         if: success() || failure()
         run: |
           if command -v safety &> /dev/null && [ -f "requirements.txt" ]; then
-            safety check -r requirements.txt --full-report || echo "Safety check failed but continuing..."
+            if ! safety check -r requirements.txt --full-report; then
+              echo "::error::Security vulnerabilities found in dependencies"
+              exit 1
+            fi
+            echo "Security check passed successfully - no known vulnerabilities found"
           else
             echo "Safety check skipped - tool or requirements not available"
-          fi
-        continue-on-error: true
-
-      - name: Generate dependency report
-        if: always()
-        run: |
-          echo "## Dependency Report" > dependency-report.md
-          echo "### Python Dependencies" >> dependency-report.md
-          if [ -f "requirements.txt" ]; then
-            echo "Found requirements.txt:" >> dependency-report.md
-            echo "\`\`\`" >> dependency-report.md
-            cat requirements.txt >> dependency-report.md
-            echo "\`\`\`" >> dependency-report.md
-          else
-            echo "No requirements.txt found." >> dependency-report.md
-          fi
-          echo "### Status" >> dependency-report.md
-          echo "- Requirements Check: ${{ job.steps.validate.outcome || 'SKIPPED' }}" >> dependency-report.md
-          echo "- Security Check: ${{ job.steps.safety.outcome || 'SKIPPED' }}" >> dependency-report.md
-
-      - name: Upload dependency report
-        if: always()
-        uses: actions/upload-artifact@v3
-        with:
-          name: dependency-report
-          path: dependency-report.md
-          retention-days: 5 
+          fi 
