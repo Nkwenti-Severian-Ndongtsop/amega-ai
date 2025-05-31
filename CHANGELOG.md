@@ -30,6 +30,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - aiohttp>=3.9.0 for async HTTP requests
   - tenacity>=8.2.0 for retry logic
   - numpy>=1.24.0 for vector operations
+- Vector store management system with ChromaDB:
+  - Efficient storage and retrieval of code embeddings
+  - Similarity search with customizable metrics
+  - Metadata filtering and querying
+  - Batch processing for large datasets
+  - Persistent storage support
+  - Collection management and statistics
+  - Added chromadb>=0.4.22 dependency
+  - Environment-based configuration with auto-directory creation
+  - Pydantic settings integration for type-safe config
 
 ### Changed
 - Updated DeepSource configuration for Python and Shell analysis
@@ -37,6 +47,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed role hierarchy implementation in security middleware
 - Enhanced CodeChunk dataclass with embedding support
 - Updated requirements.txt with new dependencies
+- Improved vector store initialization with automatic directory creation
+- Enhanced environment variable template with vector store settings
 
 ### Deprecated
 - N/A
